@@ -1,0 +1,94 @@
+name: home-remote
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: home-remote:local
+    env_file:
+      - .env
+    environment:
+      HOST: 0.0.0.0
+      PORT: 3000
+      DATABASE_PATH: /app/data/home-remote.db
+      HOME_ASSISTANT_URL: http://homeassistant:8123
+    ports:
+      - "127.0.0.1:${PORT:-3000}:3000"
+    volumes:
+      - home-remote-data:/app/data
+    init: true
+    restart: unless-stopped
+    stop_grace_period: 15s
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:3000/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+  yandex-station-installer:
+    build:
+      context: .
+      dockerfile: Dockerfile.yandex-station
+    image: home-remote/yandex-station-installer:3.22.3
+    volumes:
+      - home-assistant-config:/config
+    restart: "no"
+
+  homeassistant:
+    image: ghcr.io/home-assistant/home-assistant:stable
+    depends_on:
+      yandex-station-installer:
+        condition: service_completed_successfully
+    environment:
+      TZ: Europe/Moscow
+    ports:
+      - "127.0.0.1:8123:8123"
+    volumes:
+      - home-assistant-config:/config
+    restart: unless-stopped
+    stop_grace_period: 60s
+    healthcheck:
+      test:
+        - CMD
+        - python3
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8123/', timeout=5)"
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 90s
+
+  music-assistant:
+    image: ghcr.io/music-assistant/server:latest
+    container_name: home-remote-music-assistant
+    network_mode: host
+    environment:
+      LOG_LEVEL: info
+      PYTHONPATH: /compat
+      TZ: Europe/Moscow
+    volumes:
+      - music-assistant-data:/data
+      - ./music_assistant_compat:/compat:ro
+    restart: unless-stopped
+    stop_grace_period: 30s
+
+volumes:
+  home-remote-data:
+    name: home-remote-data
+  home-assistant-config:
+    name: home-assistant-config
+  music-assistant-data:
+    name: home-remote-music-assistant-data

@@ -1,0 +1,11 @@
+FROM alpine/git:2.49.1 AS source
+
+RUN git clone --depth 1 --branch v3.22.3 \
+    https://github.com/AlexxIT/YandexStation.git /source
+
+FROM alpine:3.22
+
+COPY --from=source /source/custom_components/yandex_station /source/yandex_station
+COPY --from=source /source/LICENSE.md /source/LICENSE.md
+
+CMD ["sh", "-c", "mkdir -p /config/custom_components /config/licenses && rm -rf /config/custom_components/yandex_station && cp -R /source/yandex_station /config/custom_components/yandex_station && cp /source/LICENSE.md /config/licenses/YandexStation-LICENSE.md"]
