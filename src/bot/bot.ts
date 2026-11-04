@@ -111,6 +111,18 @@ export function createTelegramBot(deps: BotDependencies): Bot {
     }
   });
 
+  bot.command("say", async (ctx) => {
+    try {
+      const phrase = ctx.match.trim();
+      await deps.music.speak(phrase);
+      await ctx.reply(`Фраза отправлена на колонку: ${phrase}`, {
+        reply_markup: musicKeyboard(String(ctx.from!.id), deps),
+      });
+    } catch (error) {
+      await ctx.reply(userError(error));
+    }
+  });
+
   bot.command("pause", async (ctx) => {
     try {
       requireOwner(String(ctx.from!.id), deps);
@@ -367,7 +379,6 @@ async function handleCallback(
     return;
   }
   if (payload.kind === "music_speak") {
-    requireOwner(actorId, deps);
     deps.awaitingTrack.delete(actorId);
     deps.awaitingSpeech.add(actorId);
     await ctx.reply("Введите фразу, которую должна произнести Алиса. Максимум 100 символов.", {
@@ -523,7 +534,7 @@ function homeView(actorId: string, deps: BotDependencies): View {
   }
   const text = isOwner
     ? `Умный дом\n\n${catalog.devices.length} устройств. Каталог: ${new Date(catalog.syncedAt).toLocaleString("ru-RU")}.`
-    : "Привет! Здесь можно добавлять песни в общую очередь и устанавливать громкость от 1 до 6.\n\nОткройте «Музыка и громкость», чтобы начать.";
+    : "Привет! Здесь можно добавлять песни в общую очередь, устанавливать громкость от 1 до 6 и отправлять текст для произнесения на колонке.\n\nОткройте «Музыка и громкость», чтобы начать.";
   return [text, { reply_markup: keyboard }];
 }
 
@@ -647,9 +658,7 @@ function musicKeyboard(actorId: string, deps: BotDependencies): InlineKeyboard {
     keyboard.text("Очередь", callback(actorId, { kind: "music_queue" }, deps)).row();
   }
   keyboard.text("Добавить песню", callback(actorId, { kind: "music_prompt" }, deps)).row();
-  if (isOwner) {
-    keyboard.text("Произнести фразу", callback(actorId, { kind: "music_speak" }, deps)).row();
-  }
+  keyboard.text("Произнести фразу", callback(actorId, { kind: "music_speak" }, deps)).row();
   const maxVolume = maxVolumeForRole(isOwner);
   const rowSize = maxVolume === 6 ? 3 : 5;
   for (let level = 1; level <= maxVolume; level += 1) {

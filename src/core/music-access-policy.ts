@@ -3,6 +3,7 @@ const REGULAR_USER_CALLBACKS = new Set([
   "music",
   "music_prompt",
   "music_queue",
+  "music_speak",
   "music_volume",
 ]);
 
